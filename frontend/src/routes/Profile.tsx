@@ -3,9 +3,11 @@ import { useLocation, useNavigate, useParams } from "react-router";
 
 import { api } from "../api/client";
 import { parseProfile } from "../api/types";
-import type { Profile as ProfileData } from "../api/types";
+import type { OwnerItem, Profile as ProfileData } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { AppBar } from "../components/AppBar";
+import { ItemFormModal } from "../components/profile/ItemFormModal";
+import type { ItemFormState } from "../components/profile/ItemFormModal";
 import { ItemModal } from "../components/profile/ItemModal";
 import { ProfileGrid } from "../components/profile/ProfileGrid";
 import { ShuffleDeck } from "../components/profile/ShuffleDeck";
@@ -37,6 +39,7 @@ export default function Profile() {
   const [phase, setPhase] = useState<"deck" | "reveal" | "grid">("grid");
   const [deckOrder, setDeckOrder] = useState<string[]>([]);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
+  const [itemForm, setItemForm] = useState<ItemFormState | null>(null);
   const cameFromDeck = useRef(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -144,6 +147,32 @@ export default function Profile() {
     [],
   );
 
+  // create/edit/delete only ever touch the OWNER view of the profile
+  const handleItemSaved = useCallback((saved: OwnerItem, mode: "create" | "edit") => {
+    setStatus((current) => {
+      if (current.kind !== "ready" || current.profile.view !== "owner") return current;
+      const items =
+        mode === "create"
+          ? [...current.profile.items, saved]
+          : current.profile.items.map((item) => (item.id === saved.id ? saved : item));
+      return { kind: "ready", profile: { ...current.profile, items } };
+    });
+  }, []);
+
+  const handleItemDeleted = useCallback((id: string) => {
+    setOpenItemId((open) => (open === id ? null : open));
+    setStatus((current) => {
+      if (current.kind !== "ready" || current.profile.view !== "owner") return current;
+      return {
+        kind: "ready",
+        profile: {
+          ...current.profile,
+          items: current.profile.items.filter((item) => item.id !== id),
+        },
+      };
+    });
+  }, []);
+
   const handleReorder = useCallback(
     (ids: string[]) => {
       if (status.kind !== "ready" || status.profile.view !== "owner") return;
@@ -222,13 +251,42 @@ export default function Profile() {
     <>
       <AppBar />
       <main className="mx-auto w-full max-w-5xl px-4 pb-16">
-        <header className="pb-5 pt-4">
-          <h1 className="font-display text-3xl font-bold leading-tight">
-            {profile.display_name ?? profile.username}
-          </h1>
-          <Stamp className="text-ink-soft">u/{profile.username}</Stamp>
-          {profile.bio && (
-            <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">{profile.bio}</p>
+        <header className="flex flex-wrap items-start justify-between gap-4 pb-5 pt-4">
+          <div className="flex min-w-0 items-start gap-3">
+            {profile.avatar_url && (
+              <img
+                src={profile.avatar_url}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-full border-2 border-ink object-cover"
+              />
+            )}
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl font-bold leading-tight">
+                {profile.display_name ?? profile.username}
+              </h1>
+              <Stamp className="text-ink-soft">u/{profile.username}</Stamp>
+              {profile.bio && (
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+                  {profile.bio}
+                </p>
+              )}
+            </div>
+          </div>
+          {isOwnProfile && (
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                variant="primary"
+                disabled={profile.items.length >= 40}
+                onClick={() => setItemForm({ mode: "create" })}
+              >
+                Add a wish
+              </Button>
+              {profile.items.length >= 40 && (
+                <Stamp className="text-[11px] text-ink-soft">
+                  40 of 40. Delete something to add more.
+                </Stamp>
+              )}
+            </div>
           )}
         </header>
 
@@ -238,10 +296,7 @@ export default function Profile() {
               title="Nothing here yet"
               body="Add your first wish — a photo and a name is all it takes."
               action={
-                <Button
-                  variant="primary"
-                  onClick={() => toast("Adding wishes lands in the next update.")}
-                >
+                <Button variant="primary" onClick={() => setItemForm({ mode: "create" })}>
                   Add your first wish
                 </Button>
               }
@@ -283,7 +338,18 @@ export default function Profile() {
         ownerUsername={profile.username}
         onClose={() => setOpenItemId(null)}
         onReservationChange={handleReservationChange}
+        onEdit={
+          isOwnProfile
+            ? (item) => {
+                setOpenItemId(null);
+                setItemForm({ mode: "edit", item });
+              }
+            : undefined
+        }
+        onDeleted={isOwnProfile ? handleItemDeleted : undefined}
       />
+
+      <ItemFormModal state={itemForm} onClose={() => setItemForm(null)} onSaved={handleItemSaved} />
     </>
   );
 }

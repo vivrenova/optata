@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { api, ApiError, errorDetail } from "../../api/client";
 import { formatPrice } from "../../api/types";
-import type { WishlistItem } from "../../api/types";
+import type { OwnerItem, WishlistItem } from "../../api/types";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { Stamp } from "../ui/Stamp";
@@ -20,11 +20,16 @@ export function ItemModal({
   ownerUsername,
   onClose,
   onReservationChange,
+  onEdit,
+  onDeleted,
 }: {
   item: WishlistItem | null;
   ownerUsername: string;
   onClose: () => void;
   onReservationChange: (id: string, patch: ReservationPatch) => void;
+  /** Owner-only actions (Stage 5). Absent for guests/anonymous. */
+  onEdit?: (item: OwnerItem) => void;
+  onDeleted?: (id: string) => void;
 }) {
   return (
     <Modal open={item !== null} onClose={onClose} title={item?.title ?? ""}>
@@ -33,6 +38,8 @@ export function ItemModal({
           item={item}
           ownerUsername={ownerUsername}
           onReservationChange={onReservationChange}
+          onEdit={onEdit}
+          onDeleted={onDeleted}
         />
       )}
     </Modal>
@@ -43,16 +50,40 @@ function ItemModalBody({
   item,
   ownerUsername,
   onReservationChange,
+  onEdit,
+  onDeleted,
 }: {
   item: WishlistItem;
   ownerUsername: string;
   onReservationChange: (id: string, patch: ReservationPatch) => void;
+  onEdit?: (item: OwnerItem) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [busy, setBusy] = useState(false);
   const [loginPrompt, setLoginPrompt] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  async function deleteItem() {
+    if (item.view !== "owner") return;
+    setBusy(true);
+    try {
+      const response = await api(`/items/${item.id}`, { method: "DELETE" });
+      if (response.status === 204) {
+        onDeleted?.(item.id);
+        toast("Deleted. Gone for good.");
+      } else {
+        const parsed: unknown = await response.json().catch(() => null);
+        toast(errorDetail(parsed, "That didn't go through. Try again."), "danger");
+      }
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const price = formatPrice(item.price, item.currency);
 
@@ -137,6 +168,31 @@ function ItemModalBody({
             I'll gift this
           </Button>
         ))}
+
+      {/* owner actions — edit and a two-step delete. Copy stays neutral
+          about reservations: the owner must learn nothing from this modal. */}
+      {item.view === "owner" && onEdit && onDeleted && (
+        <div className="flex flex-col gap-2">
+          <Button variant="secondary" onClick={() => onEdit(item)}>
+            Edit
+          </Button>
+          {confirmingDelete ? (
+            <div className="flex flex-col gap-2 rounded-[10px] border-2 border-danger p-3">
+              <p className="text-sm">Delete for good? The photo goes too.</p>
+              <Button variant="danger" loading={busy} onClick={() => void deleteItem()}>
+                Delete forever
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                Keep it
+              </Button>
+            </div>
+          ) : (
+            <Button variant="ghost" className="text-danger" onClick={() => setConfirmingDelete(true)}>
+              Delete
+            </Button>
+          )}
+        </div>
+      )}
 
       {item.view === "anonymous" &&
         (loginPrompt ? (

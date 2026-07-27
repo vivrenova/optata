@@ -39,14 +39,67 @@ export class ApiError extends Error {
 export const NETWORK_ERROR_MESSAGE =
   "Can't reach the server. Check your connection and try again.";
 
+interface ValidationIssue {
+  type?: string;
+  loc?: Array<string | number>;
+  msg?: string;
+  ctx?: { min_length?: number; max_length?: number };
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  email: "email",
+  username: "username",
+  password: "password",
+  new_password: "new password",
+  current_password: "current password",
+  title: "title",
+  link: "link",
+  note: "note",
+  price: "price",
+};
+
+/** Raw Pydantic messages read like a stack trace. Turn the common ones into
+ * copy that says what broke and what to do about it. */
+function humanizeIssue(issue: ValidationIssue): string | null {
+  const field = [...(issue.loc ?? [])].reverse().find((part): part is string => typeof part === "string");
+  const label = field ? (FIELD_LABELS[field] ?? field.replace(/_/g, " ")) : null;
+  const msg = issue.msg ?? "";
+
+  if (msg.toLowerCase().includes("email address")) {
+    return "That doesn't look like an email address. Check it and try again.";
+  }
+  switch (issue.type) {
+    case "missing":
+      return label ? `Fill in the ${label} field.` : "A required field is missing.";
+    case "string_too_short": {
+      const min = issue.ctx?.min_length;
+      if (field === "password" || field === "new_password") {
+        return `Password needs at least ${min ?? 8} characters.`;
+      }
+      return label && min ? `The ${label} needs at least ${min} characters.` : null;
+    }
+    case "string_too_long": {
+      const max = issue.ctx?.max_length;
+      return label && max ? `The ${label} is limited to ${max} characters.` : null;
+    }
+    default:
+      return null;
+  }
+}
+
 /** Pydantic 422s send {detail: [{msg, ...}]}; everything else {detail: str}. */
 export function errorDetail(body: unknown, fallback: string): string {
   if (body && typeof body === "object" && "detail" in body) {
     const detail = (body as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail) && detail.length > 0) {
-      const first = detail[0] as { msg?: unknown };
-      if (typeof first.msg === "string") return first.msg.replace(/^Value error, /, "");
+      const first = detail[0] as ValidationIssue;
+      const humanized = humanizeIssue(first);
+      if (humanized) return humanized;
+      if (typeof first.msg === "string" && first.msg.length > 0) {
+        // custom validators already write human copy; strip the prefix
+        return first.msg.replace(/^Value error, /, "");
+      }
     }
   }
   return fallback;

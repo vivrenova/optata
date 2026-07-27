@@ -43,6 +43,14 @@ export function CardMedia({
           src={item.image_url}
           alt={item.title}
           draggable={false}
+          // A cached image can be complete BEFORE React attaches onLoad —
+          // the event then never fires and the photo would stay at
+          // opacity 0 forever. The ref check covers that path.
+          ref={(el) => {
+            if (el && el.complete && el.naturalWidth > 0) {
+              setState((current) => (current === "loading" ? "ready" : current));
+            }
+          }}
           onLoad={() => setState("ready")}
           onError={() => setState("failed")}
           className={cn(

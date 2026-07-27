@@ -113,3 +113,33 @@ export function formatPrice(price: string | null, currency: string | null): stri
   const trimmed = price.replace(/\.00$/, "");
   return `${trimmed} ${currency}`;
 }
+
+// --- users/search ---
+
+export interface PublicUser {
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+}
+
+// --- reservations ---
+
+export interface ReservedItem {
+  id: string;
+  title: string;
+  image_url: string;
+  accent_color: string;
+  link: string | null;
+  price: string | null;
+  currency: string | null;
+  owner_username: string;
+}
+
+export interface ReservationEntry {
+  id: string;
+  /** null → the owner deleted the item; the tombstone snapshot fills in */
+  item: ReservedItem | null;
+  tombstone: { title: string; owner_username: string } | null;
+  created_at: string;
+}

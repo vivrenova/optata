@@ -66,7 +66,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       >
         {/* scroll lives INSIDE the tag so the silhouette and its offset
             shadow are never clipped by overflow */}
-        <div className="max-h-[78dvh] overflow-y-auto px-6 pb-6 pt-1">
+        <div className="max-h-[90dvh] overflow-y-auto px-6 pb-6 pt-1">
           <h2 className="font-display text-xl font-semibold">{title}</h2>
           <div className="mt-4">{children}</div>
         </div>

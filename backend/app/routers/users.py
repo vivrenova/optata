@@ -1,12 +1,15 @@
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 
 from app.deps import CurrentUser, DbSession, OptionalUser
 from app.models import Item, Reservation, User
 from app.routers.auth import revoke_all_refresh_tokens
+from app.routers.items import _process_upload
+from app.storage import StorageError, storage
 from app.schemas import (
     ItemAnonymousOut,
     ItemGuestOut,
@@ -168,3 +171,29 @@ async def change_password(body: PasswordChangeIn, db: DbSession, current_user: C
     # Other sessions die; this one lives until its access token expires
     await revoke_all_refresh_tokens(db, current_user.id)
     await db.commit()
+
+
+@router.post("/me/avatar", response_model=UserPrivate)
+async def upload_avatar(
+    db: DbSession,
+    current_user: CurrentUser,
+    image: UploadFile = File(),
+) -> UserPrivate:
+    """Same pipeline as item photos: Pillow re-encode (validates the bytes,
+    strips EXIF/GPS), immutable storage key, old object deleted after the
+    row points at the new one."""
+    webp = await _process_upload(image)
+    new_path = f"{current_user.id}/avatar/{uuid.uuid4()}.webp"
+    try:
+        await storage.upload_item_image(new_path, webp)
+    except StorageError:
+        raise HTTPException(502, "Couldn't store the avatar. Try again in a moment.")
+
+    old_path = current_user.avatar_path
+    current_user.avatar_path = new_path
+    current_user.avatar_url = storage.public_url(new_path)
+    await db.commit()
+    if old_path:
+        await storage.delete_item_image(old_path)  # best-effort, after commit
+    await db.refresh(current_user)
+    return UserPrivate.model_validate(current_user)

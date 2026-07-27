@@ -29,9 +29,24 @@ const GROMMET_H = 38;
 const HOLE_CY = GROMMET_H / 2; // dead-centre of the grommet band
 const HOLE_R = 5; // delicate grommet, not a hammered hole
 const HOLE_RING_W = 1.25;
-// diagonal overlaps the two straight edges it meets, so the cut corner
-// reads as one continuous stroke with no notch at the joins
-const DIAG_OVERLAP = 1.1;
+const STROKE_W = 2;
+const STROKE_OUTER = STROKE_W / 2; // 1px — how far the outline sits outside the box
+
+// The chamfer stroke is drawn long (so it always reaches into both joins —
+// no hairline notch) and then CLIPPED to the corner. The clip stops it at
+// exactly x = -1 and y = -1, which is the outer edge of the 2px outline
+// stroke on the left and top edges, so the diagonal terminates flush with
+// the silhouette instead of spurring past it.
+const DIAG_OVERLAP = 4;
+const DIAG_CLIP = `-${STROKE_OUTER},-${STROKE_OUTER} ${CUT * 2},-${STROKE_OUTER} -${STROKE_OUTER},${CUT * 2}`;
+
+// The cut is subtracted as a triangle whose legs run OUTSIDE the box. Its
+// hypotenuse is still exactly x + y = CUT (both far points sum to CUT), so
+// the chamfer line is unchanged — but extending the legs also removes the
+// 1px of outline stroke that hangs outside the box above the cut, which
+// would otherwise survive as a sliver up the left and top edges.
+const CUT_MARGIN = 6;
+const CUT_POLY = `${-CUT_MARGIN},${-CUT_MARGIN} ${CUT + CUT_MARGIN},${-CUT_MARGIN} ${-CUT_MARGIN},${CUT + CUT_MARGIN}`;
 
 interface TagProps extends ComponentPropsWithRef<"div"> {
   /** Punched hole + grommet band. Default on — it IS the brand. */
@@ -64,9 +79,10 @@ export function Tag({
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const fillMaskId = `tag-fill-${uid}`;
   const strokeMaskId = `tag-stroke-${uid}`;
+  const diagClipId = `tag-diag-${uid}`;
   const offset = lift ? 8 : 5;
 
-  const cutTriangle = cut ? <polygon points={`0,0 ${CUT},0 0,${CUT}`} fill="black" /> : null;
+  const cutTriangle = cut ? <polygon points={CUT_POLY} fill="black" /> : null;
 
   return (
     <div className={cn("relative", className)} {...rest}>
@@ -86,12 +102,20 @@ export function Tag({
             {cutTriangle}
             {hole && <circle cx="50%" cy={HOLE_CY} r={HOLE_R} fill="black" />}
           </mask>
-          {/* stroke keeps its full 2px width on the edge: full rect − cut,
-              no rounding subtracted (the stroke rect carries its own rx) */}
+          {/* The outline's 2px stroke straddles the box edge, so 1px of it
+              sits OUTSIDE. This mask must therefore extend past the box —
+              a 100%×100% white rect would shave that outer half off and
+              render every edge at 1px while the chamfer stayed 2px. */}
           <mask id={strokeMaskId}>
-            <rect width="100%" height="100%" fill="white" />
+            <rect x="-50%" y="-50%" width="200%" height="200%" fill="white" />
             {cutTriangle}
           </mask>
+          {/* bounds the chamfer stroke at the outline's own outer edge */}
+          {cut && (
+            <clipPath id={diagClipId}>
+              <polygon points={DIAG_CLIP} />
+            </clipPath>
+          )}
         </defs>
 
         {/* surface + grommet band + hairline, all shaped by the fill mask */}
@@ -126,14 +150,17 @@ export function Tag({
             className="stroke-ink"
           />
         </g>
-        {/* …plus the diagonal that closes the cut (overlapped so it joins clean) */}
+        {/* …plus the diagonal that closes the cut. Drawn long so it always
+            reaches both joins, then clipped so it stops flush at the
+            outline's outer edge instead of spurring past the corner. */}
         {cut && (
           <line
             x1={-DIAG_OVERLAP}
             y1={CUT + DIAG_OVERLAP}
             x2={CUT + DIAG_OVERLAP}
             y2={-DIAG_OVERLAP}
-            strokeWidth={2}
+            strokeWidth={STROKE_W}
+            clipPath={`url(#${diagClipId})`}
             className="stroke-ink"
           />
         )}
@@ -151,7 +178,11 @@ export function Tag({
         )}
       </svg>
 
-      <div className={cn("relative z-10", hole && "pt-[38px]")}>{children}</div>
+      {/* h-full matters: in a fixed-size tag (deck card) the content area
+          must fill the surface or a child's percentage-height chain
+          collapses to 0 and the photo vanishes; in auto-height tags
+          (grid, modals) 100%-of-auto resolves to auto — no effect. */}
+      <div className={cn("relative z-10 h-full", hole && "pt-[38px]")}>{children}</div>
     </div>
   );
 }

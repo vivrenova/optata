@@ -76,6 +76,83 @@ describe("single-flight refresh", () => {
   });
 });
 
+describe("errorDetail humanizes raw Pydantic validation output", () => {
+  it("email format errors become plain copy, not a parser trace", async () => {
+    const client = await freshClient();
+    const body = {
+      detail: [
+        {
+          type: "value_error",
+          loc: ["body", "email"],
+          msg: "value is not a valid email address: The part after the @-sign is missing.",
+        },
+      ],
+    };
+    expect(client.errorDetail(body, "x")).toBe(
+      "That doesn't look like an email address. Check it and try again.",
+    );
+  });
+
+  it("too-short passwords get the human minimum", async () => {
+    const client = await freshClient();
+    const body = {
+      detail: [
+        {
+          type: "string_too_short",
+          loc: ["body", "password"],
+          msg: "String should have at least 8 characters",
+          ctx: { min_length: 8 },
+        },
+      ],
+    };
+    expect(client.errorDetail(body, "x")).toBe("Password needs at least 8 characters.");
+  });
+
+  it("missing fields name the field", async () => {
+    const client = await freshClient();
+    const body = { detail: [{ type: "missing", loc: ["body", "title"], msg: "Field required" }] };
+    expect(client.errorDetail(body, "x")).toBe("Fill in the title field.");
+  });
+
+  it("too-long fields name the limit", async () => {
+    const client = await freshClient();
+    const body = {
+      detail: [
+        {
+          type: "string_too_long",
+          loc: ["body", "note"],
+          msg: "String should have at most 280 characters",
+          ctx: { max_length: 280 },
+        },
+      ],
+    };
+    expect(client.errorDetail(body, "x")).toBe("The note is limited to 280 characters.");
+  });
+
+  it("custom validator copy passes through with the prefix stripped", async () => {
+    const client = await freshClient();
+    const body = {
+      detail: [
+        {
+          type: "value_error",
+          loc: ["body", "username"],
+          msg: "Value error, Username must be 3-20 characters: lowercase letters, digits, underscore.",
+        },
+      ],
+    };
+    expect(client.errorDetail(body, "x")).toBe(
+      "Username must be 3-20 characters: lowercase letters, digits, underscore.",
+    );
+  });
+
+  it("plain string details are returned untouched", async () => {
+    const client = await freshClient();
+    expect(client.errorDetail({ detail: "This username is taken." }, "x")).toBe(
+      "This username is taken.",
+    );
+  });
+});
+
 describe("RFC 6750 challenge handling", () => {
   it("invalid_token → one refresh, one retry", async () => {
     const client = await freshClient();
