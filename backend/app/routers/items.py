@@ -56,7 +56,7 @@ async def _stash_user_identifier(request: Request, current_user: CurrentUser) ->
 def _clean_title(raw: str) -> str:
     title = raw.strip()
     if not title:
-        raise HTTPException(422, "Title can't be empty.")
+        raise HTTPException(422, "Give it a name — even “those boots” works.")
     if len(title) > 80:
         raise HTTPException(422, "Title is limited to 80 characters.")
     return title
@@ -88,17 +88,17 @@ def _clean_price_currency(price_raw: str | None, currency_raw: str | None) -> tu
     if not price_raw and not currency_raw:
         return None, None
     if not price_raw or not currency_raw:
-        raise HTTPException(422, "Price and currency go together — send both or neither.")
+        raise HTTPException(422, "Price and currency travel together — set both or neither.")
     if currency_raw not in CURRENCIES:
         raise HTTPException(422, "Currency must be one of UAH, USD, EUR, PLN.")
     try:
         price = Decimal(price_raw).quantize(Decimal("0.01"))
     except InvalidOperation:
-        raise HTTPException(422, "Price must be a number.")
+        raise HTTPException(422, "Prices look like 1200 or 49.99 — digits only.")
     if price < 0:
-        raise HTTPException(422, "Price can't be negative.")
+        raise HTTPException(422, "A negative price would make it a gift to them.")
     if price > MAX_PRICE:
-        raise HTTPException(422, "That price is too large.")
+        raise HTTPException(422, "That price is too big for us to store.")
     return price, currency_raw
 
 
@@ -111,19 +111,19 @@ async def _process_upload(image: StarletteUploadFile) -> bytes:
     if image.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            "Only WebP, JPEG or PNG images are accepted.",
+            "That format won't work here. Use a JPEG, PNG or WebP.",
         )
     data = await image.read()
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,
-            "Image is over 500KB. Resize it and try again.",
+            "That image is over 500KB. Shrink it and try again.",
         )
     try:
         return await anyio.to_thread.run_sync(reencode_webp, data)
     except ValueError:
         raise HTTPException(
-            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "That file isn't a valid image."
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "That file isn't an image we can read."
         )
 
 
@@ -137,9 +137,9 @@ def _new_image_path(user_id: uuid.UUID, item_id: uuid.UUID) -> str:
 async def _get_owned_item(db: DbSession, item_id: uuid.UUID, current_user: CurrentUser) -> Item:
     item = await db.get(Item, item_id)
     if item is None:
-        raise HTTPException(404, "Item not found.")
+        raise HTTPException(404, "That item is gone.")
     if item.user_id != current_user.id:
-        raise HTTPException(403, "This isn't your item.")
+        raise HTTPException(403, "That's not yours to change.")
     return item
 
 
@@ -172,7 +172,7 @@ async def create_item(
         select(func.count()).select_from(Item).where(Item.user_id == current_user.id)
     )
     if count is not None and count >= MAX_ITEMS:
-        raise HTTPException(409, "40 of 40. Delete something to add more.")
+        raise HTTPException(409, "That's 40 of 40 — your list is full. Delete one to add another.")
 
     clean_title = _clean_title(title)
     clean_link = _clean_link(link)

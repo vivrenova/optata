@@ -37,7 +37,7 @@ export default function Search() {
           value={query}
           inputClassName="font-mono lowercase"
           placeholder="bohdan"
-          hint={`Prefix search — ${MIN_QUERY} letters minimum.`}
+          hint={`First ${MIN_QUERY} letters are enough.`}
           onChange={(event) => setQuery(event.target.value)}
         />
 
@@ -45,7 +45,7 @@ export default function Search() {
           {query.trim().length < MIN_QUERY ? (
             <EmptyState
               title="Whose wishes are you after?"
-              body={`Type at least ${MIN_QUERY} letters of their username.`}
+              body={`Type at least ${MIN_QUERY} letters of their username and we'll find them.`}
             />
           ) : searching && results.length === 0 ? (
             <div className="flex flex-col gap-3">
@@ -55,8 +55,8 @@ export default function Search() {
             </div>
           ) : results.length === 0 ? (
             <EmptyState
-              title="No one by that name yet"
-              body="Check the spelling — or invite them to make a wishlist."
+              title="Nobody by that name"
+              body="Check the spelling — or tell them to start a wishlist."
             />
           ) : (
             <Tag hole={false} className="p-2">

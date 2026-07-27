@@ -35,7 +35,7 @@ export function AppBar() {
             onClick={() => navigate("/reservations")}
             className="h-9 px-2.5 text-sm"
           >
-            Dibs
+            My dibs
           </Button>
           <Button
             variant="ghost"
@@ -58,7 +58,7 @@ export function AppBar() {
             onClick={() => navigate("/register")}
             className="h-9 px-3 text-sm"
           >
-            Create yours
+            Start yours
           </Button>
         </div>
       )}

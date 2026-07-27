@@ -56,7 +56,7 @@ async def search_users(db: DbSession, q: str = Query(default="")) -> list[UserPu
 @router.get("/me", include_in_schema=False)
 async def users_me_guard() -> None:
     # /users/{username} must never swallow "me"
-    raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Nobody owns that username.")
 
 
 @router.get(
@@ -72,7 +72,7 @@ async def get_profile(
     their own spoilers the first time they open an incognito window."""
     user = await db.scalar(select(User).where(User.username == username.strip().lower()))
     if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nobody owns that username.")
 
     items = (
         await db.scalars(select(Item).where(Item.user_id == user.id).order_by(Item.order_index))
@@ -154,7 +154,7 @@ async def update_me(body: UserUpdateIn, db: DbSession, current_user: CurrentUser
                 )
         taken = await db.scalar(select(User.id).where(User.username == body.username))
         if taken:
-            raise HTTPException(status.HTTP_409_CONFLICT, "This username is taken.")
+            raise HTTPException(status.HTTP_409_CONFLICT, "Someone got there first. Pick another username.")
         current_user.username = body.username
         current_user.username_changed_at = now
 
@@ -166,7 +166,7 @@ async def update_me(body: UserUpdateIn, db: DbSession, current_user: CurrentUser
 @router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(body: PasswordChangeIn, db: DbSession, current_user: CurrentUser) -> None:
     if not verify_password(body.current_password, current_user.password_hash):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect.")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That current password isn't right.")
     current_user.password_hash = hash_password(body.new_password)
     # Other sessions die; this one lives until its access token expires
     await revoke_all_refresh_tokens(db, current_user.id)

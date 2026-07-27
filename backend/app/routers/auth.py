@@ -38,7 +38,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
 
-LOGIN_FAILED = "Invalid email or password."  # identical for unknown email and wrong password
+LOGIN_FAILED = "Wrong email or password."  # identical for unknown email and wrong password
 
 
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
@@ -117,10 +117,10 @@ async def _stash_forgot_identifier(request: Request, body: ForgotPasswordIn) -> 
 async def register(request: Request, body: RegisterIn, response: Response, db: DbSession) -> TokenOut:
     email_taken = await db.scalar(select(User.id).where(User.email == body.email))
     if email_taken:
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "There's already an account with this email.")
     username_taken = await db.scalar(select(User.id).where(User.username == body.username))
     if username_taken:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This username is taken.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Someone got there first. Pick another username.")
 
     user = User(email=body.email, username=body.username, password_hash=hash_password(body.password))
     db.add(user)
@@ -128,7 +128,7 @@ async def register(request: Request, body: RegisterIn, response: Response, db: D
         await db.flush()
     except IntegrityError:
         # Lost a race with a concurrent registration on a unique column
-        raise HTTPException(status.HTTP_409_CONFLICT, "This email or username is taken.")
+        raise HTTPException(status.HTTP_409_CONFLICT, "That email or username is already taken.")
 
     raw_refresh, _ = await _issue_refresh_token(db, user.id)
     await db.commit()

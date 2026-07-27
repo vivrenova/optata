@@ -22,13 +22,13 @@ async def reserve_item(
 ) -> ReservationCreatedOut:
     item = await db.get(Item, item_id)
     if item is None:
-        raise HTTPException(404, "Item not found.")
+        raise HTTPException(404, "That item is gone.")
     if item.user_id == current_user.id:
-        raise HTTPException(403, "You can't reserve your own item.")
+        raise HTTPException(403, "You can't gift something to yourself.")
 
     already = await db.scalar(select(Reservation.id).where(Reservation.item_id == item_id))
     if already is not None:
-        raise HTTPException(409, "Someone is already gifting this.")
+        raise HTTPException(409, "Someone already called dibs on this one.")
 
     owner_username = await db.scalar(select(User.username).where(User.id == item.user_id))
     db.add(
@@ -44,7 +44,7 @@ async def reserve_item(
     except IntegrityError:
         # Lost the race — the DB unique constraint on item_id is the authority
         await db.rollback()
-        raise HTTPException(409, "Someone is already gifting this.")
+        raise HTTPException(409, "Someone already called dibs on this one.")
     return ReservationCreatedOut(item_id=item_id)
 
 
@@ -56,7 +56,7 @@ async def unreserve_item(item_id: uuid.UUID, db: DbSession, current_user: Curren
         )
     )
     if result.rowcount == 0:
-        raise HTTPException(404, "You haven't reserved this item.")
+        raise HTTPException(404, "You haven't called dibs on this one.")
     await db.commit()
 
 
@@ -121,5 +121,5 @@ async def dismiss_reservation(
         )
     )
     if result.rowcount == 0:
-        raise HTTPException(404, "No such reservation of yours.")
+        raise HTTPException(404, "That isn't on your list.")
     await db.commit()

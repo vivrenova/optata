@@ -99,7 +99,7 @@ export function ItemFormModal({
         return result;
       });
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "Couldn't process that photo.");
+      setPhotoError(err instanceof Error ? err.message : "That photo wouldn't process. Try another one.");
     } finally {
       setProcessing(false);
     }
@@ -111,11 +111,11 @@ export function ItemFormModal({
 
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      setFormError("Give it a title — that's the one required word.");
+      setFormError("Give it a name — even “those boots” works.");
       return;
     }
     if (state!.mode === "create" && !processed) {
-      setFormError("Add a photo — a wish without one is just a note.");
+      setFormError("Add a photo — a wish without one is just a shopping list.");
       return;
     }
     const hasPrice = price.trim() !== "";
@@ -125,7 +125,7 @@ export function ItemFormModal({
       return;
     }
     if (hasPrice && !/^\d+([.,]\d{1,2})?$/.test(price.trim())) {
-      setFormError("Price must be a number like 1200 or 49.99.");
+      setFormError("Prices look like 1200 or 49.99 — digits only.");
       return;
     }
     const cleanLink = link.trim();
@@ -185,7 +185,11 @@ export function ItemFormModal({
       const saved = (await response.json()) as Omit<OwnerItem, "view">;
       const ownerItem: OwnerItem = { ...saved, price: saved.price == null ? null : String(saved.price), view: "owner" };
       onSaved(ownerItem, state!.mode);
-      toast(state!.mode === "create" ? "Added. Deal it to your friends." : "Saved.");
+      toast(
+        state!.mode === "create"
+          ? "On the list. Share your link and let them fight over it."
+          : "Saved.",
+      );
       onClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Can't reach the server. Try again.");
@@ -198,7 +202,7 @@ export function ItemFormModal({
     <Modal
       open={state !== null}
       onClose={onClose}
-      title={state.mode === "create" ? "Add a wish" : "Edit wish"}
+      title={state.mode === "create" ? "Add something you want" : "Edit this wish"}
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         {formError && (
@@ -233,7 +237,7 @@ export function ItemFormModal({
             loading={processing}
             onClick={() => fileInputRef.current?.click()}
           >
-            {processed || editing ? "Replace the photo" : "Choose a photo"}
+            {processed || editing ? "Swap the photo" : "Pick a photo"}
           </Button>
           {processed && (
             <Stamp className="text-[11px] text-ink-soft">
@@ -290,7 +294,7 @@ export function ItemFormModal({
         />
 
         <Button type="submit" variant="primary" loading={submitting} className="w-full">
-          {state.mode === "create" ? "Add to my wishlist" : "Save changes"}
+          {state.mode === "create" ? "Add it to my list" : "Save changes"}
         </Button>
       </form>
     </Modal>

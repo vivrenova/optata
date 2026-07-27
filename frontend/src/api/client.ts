@@ -37,7 +37,7 @@ export class ApiError extends Error {
 }
 
 export const NETWORK_ERROR_MESSAGE =
-  "Can't reach the server. Check your connection and try again.";
+  "Can't reach the server. Check your connection and try that again.";
 
 interface ValidationIssue {
   type?: string;
@@ -281,7 +281,7 @@ export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<
     }
     throw new ApiError(
       response.status,
-      errorDetail(body, "The server had a problem with that. Try again."),
+      errorDetail(body, "The server choked on that one. Try again."),
     );
   }
   if (response.status === 204) return undefined as T;

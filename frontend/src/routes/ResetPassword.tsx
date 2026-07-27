@@ -23,7 +23,8 @@ export default function ResetPassword() {
       <AuthShell title="This link is broken">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-ink-soft">
-            The reset link is missing its token — it probably got cut in half by your mail app.
+            The link is missing its token — mail apps often cut long links in half. Ask for a
+            fresh one.
           </p>
           <Button variant="primary" onClick={() => navigate("/forgot-password")} className="w-full">
             Request a new link
@@ -41,7 +42,7 @@ export default function ResetPassword() {
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match. Retype them.");
+      setError("Those two don't match. Type them again.");
       return;
     }
     setSubmitting(true);
@@ -64,7 +65,7 @@ export default function ResetPassword() {
       <AuthShell title="Password changed">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-ink-soft">
-            All other sessions are signed out. Log in with the new password.
+            Every other session is signed out. Log in with the new one.
           </p>
           <Button variant="primary" onClick={() => navigate("/login")} className="w-full">
             Log in

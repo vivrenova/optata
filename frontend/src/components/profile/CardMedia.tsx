@@ -76,7 +76,7 @@ export function CardMedia({
         <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
           <span className="rounded-[6px] border-2 border-ink bg-paper px-2 py-1">
             <Stamp className="text-[10px]">
-              {item.reserved_by_me ? "You're gifting this" : "Already being gifted"}
+              {item.reserved_by_me ? "Yours to give" : "Already spoken for"}
             </Stamp>
           </span>
         </div>

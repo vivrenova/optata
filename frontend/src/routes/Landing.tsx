@@ -31,15 +31,15 @@ export default function Landing() {
       <main className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-4 pb-14 pt-4 md:grid-cols-2">
         <section className="max-w-md">
           <h1 className="font-display text-4xl font-extrabold leading-[1.05] sm:text-5xl">
-            Your wishes as a deck of cards, not a spreadsheet.
+            One link. Everything you actually want.
           </h1>
           <p className="mt-4 text-base leading-relaxed text-ink-soft">
-            Add what you want, share one link. Friends swipe through and quietly call dibs —
-            you never find out what's taken.
+            Add what you want, share your profile. Friends swipe through and quietly call dibs
+            — you never find out what's taken.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Button variant="primary" onClick={() => navigate("/register")} className="px-7">
-              Create your wishlist
+              Start your wishlist
             </Button>
           </div>
           <Stamp className="mt-6 block text-[11px] text-ink-soft">
@@ -50,10 +50,19 @@ export default function Landing() {
         <section aria-label="Live demo" className="flex flex-col items-center gap-4">
           <DemoDeck />
           <Stamp className="text-[11px] text-ink-soft">
-            Swipe or click — that's the whole idea
+            Go on, swipe one — this is the whole app
           </Stamp>
         </section>
       </main>
+
+      <footer className="mx-auto w-full max-w-5xl px-4 pb-8">
+        <Stamp className="block text-[11px] text-ink-soft">
+          Questions or ideas?{" "}
+          <a href="mailto:hello@optata.app" className="underline underline-offset-4">
+            hello@optata.app
+          </a>
+        </Stamp>
+      </footer>
     </div>
   );
 }

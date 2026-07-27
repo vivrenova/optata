@@ -124,12 +124,12 @@ export function SearchBox({ className }: { className?: string }) {
         <div className="absolute right-0 top-11 z-40 w-64 rounded-tag border-2 border-ink bg-paper p-1.5 shadow-tag">
           {query.trim().length < MIN_QUERY ? (
             <Stamp className="block px-3 py-2 text-[11px] text-ink-soft">
-              Keep typing — {MIN_QUERY} letters minimum
+              Keep typing — {MIN_QUERY} letters
             </Stamp>
           ) : searching && results.length === 0 ? (
-            <Stamp className="block px-3 py-2 text-[11px] text-ink-soft">Searching…</Stamp>
+            <Stamp className="block px-3 py-2 text-[11px] text-ink-soft">Looking…</Stamp>
           ) : results.length === 0 ? (
-            <Stamp className="block px-3 py-2 text-[11px] text-ink-soft">No one by that name</Stamp>
+            <Stamp className="block px-3 py-2 text-[11px] text-ink-soft">Nobody by that name</Stamp>
           ) : (
             results.map((user) => (
               <UserRow key={user.username} user={user} onPick={() => go(user.username)} />
