@@ -32,7 +32,7 @@ export default function ForgotPassword() {
 
   return (
     <AuthShell
-      title="Reset your password"
+      title="Locked out?"
       footer={
         <Link to="/login" className="font-medium text-ink underline">
           Back to log in
@@ -41,16 +41,16 @@ export default function ForgotPassword() {
     >
       {sent ? (
         <div className="flex flex-col gap-3">
-          <p>If that email is registered, a reset link is on its way.</p>
+          <p>If that email is registered, a reset link is already on its way.</p>
           <p className="text-sm text-ink-soft">
-            The link works for 1 hour. Check spam if it doesn't show up.
+            It works for one hour. Check spam if it doesn't turn up.
           </p>
         </div>
       ) : (
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           {error && <FormError>{error}</FormError>}
           <p className="text-sm text-ink-soft">
-            Enter your email and we'll send a link to set a new password.
+            Give us your email and we'll send a link to set a new password.
           </p>
           <Input
             label="Email"

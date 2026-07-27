@@ -69,9 +69,12 @@ function AvatarSection({ user }: { user: UserPrivate }) {
         return;
       }
       setUser((await response.json()) as UserPrivate);
-      toast("Avatar updated.");
+      toast("New face, saved.");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Couldn't process that photo.", "danger");
+      toast(
+        err instanceof Error ? err.message : "That photo wouldn't process. Try another one.",
+        "danger",
+      );
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -134,7 +137,7 @@ function ProfileSection({ user }: { user: UserPrivate }) {
         }),
       });
       setUser(updated);
-      toast("Profile saved.");
+      toast("Saved. That's how they'll see you.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't save. Try again.");
     } finally {
@@ -153,14 +156,14 @@ function ProfileSection({ user }: { user: UserPrivate }) {
         <Input
           label="Display name"
           maxLength={40}
-          hint="Shown instead of your username. Optional."
+          hint="Optional — shown instead of your username."
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
         <TextArea
           label="Bio"
           maxLength={160}
-          hint="One or two lines about what you're into."
+          hint="A line or two about what you're into."
           value={bio}
           onChange={(e) => setBio(e.target.value)}
         />
@@ -226,7 +229,7 @@ function UsernameSection({ user }: { user: UserPrivate }) {
         body: JSON.stringify({ username: normalized }),
       });
       setUser(updated);
-      toast("Handle changed. The next change unlocks in 30 days.");
+      toast("New handle, yours. Locked in for 30 days.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't save. Try again.");
     } finally {
@@ -246,8 +249,8 @@ function UsernameSection({ user }: { user: UserPrivate }) {
           />
           <Stamp className="text-[11px] text-danger">
             Locked until{" "}
-            {lockedUntil.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — one
-            change per 30 days
+            {lockedUntil.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — you
+            get one change every 30 days
           </Stamp>
         </div>
       </SectionTag>
@@ -325,7 +328,7 @@ function PasswordSection() {
       setCurrent("");
       setNext("");
       setConfirm("");
-      toast("Password changed. Other sessions are signed out.");
+      toast("Password changed. Everywhere else is signed out.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't save. Try again.");
     } finally {
@@ -393,7 +396,7 @@ function ShuffleSection() {
           className="mt-0.5 h-5 w-5 accent-electric"
         />
         <span>
-          <span className="block text-sm font-medium">Show the shuffle deck on my own profile</span>
+          <span className="block text-sm font-medium">Deal me my own cards too</span>
           <span className="block text-xs text-ink-soft">
             Guests always get the deck — this only changes what you see. Stored on this device.
           </span>

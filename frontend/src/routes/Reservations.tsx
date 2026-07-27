@@ -61,13 +61,13 @@ function ReservationsBody() {
       const response = await api(`/items/${entry.item.id}/reserve`, { method: "DELETE" });
       if (response.status === 204) {
         removeEntry(entry.id);
-        toast("Released. It's up for grabs again.");
+        toast("Let go. It's up for grabs again.");
       } else {
         const parsed: unknown = await response.json().catch(() => null);
         toast(errorDetail(parsed, "That didn't go through. Try again."), "danger");
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try that again.", "danger");
     }
   }
 
@@ -75,9 +75,9 @@ function ReservationsBody() {
     try {
       await apiJson<void>(`/reservations/${entry.id}`, { method: "DELETE" });
       removeEntry(entry.id);
-      toast("Dismissed.");
+      toast("Cleared off your list.");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try that again.", "danger");
     }
   }
 
@@ -85,9 +85,10 @@ function ReservationsBody() {
     <>
       <AppBar />
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pb-16 pt-6">
-        <h1 className="font-display text-2xl font-semibold">My reservations</h1>
+        <h1 className="font-display text-2xl font-semibold">What you're gifting</h1>
         <p className="-mt-2 text-sm text-ink-soft">
-          Only you see this list — owners never learn what's taken.
+          Only you can see this page. No owner ever finds out what's taken — that's the
+          whole point.
         </p>
 
         {status.kind === "loading" && (
@@ -99,8 +100,8 @@ function ReservationsBody() {
 
         {status.kind === "error" && (
           <EmptyState
-            title="Couldn't load your reservations"
-            body="The server didn't answer. It may be waking up."
+            title="Couldn't load your list"
+            body="The server didn't answer. It naps on free hosting — give it a moment."
             action={
               <Button variant="primary" onClick={() => setReloadKey((k) => k + 1)}>
                 Try again
@@ -112,8 +113,8 @@ function ReservationsBody() {
         {status.kind === "ready" &&
           (status.entries.length === 0 ? (
             <EmptyState
-              title="Nothing reserved yet"
-              body="Open a friend's wishlist and call dibs — it stays a secret from them."
+              title="You haven't called dibs on anything"
+              body="Open a friend's wishlist and claim something. They'll never know it was you."
               action={
                 <Button variant="primary" onClick={() => navigate("/search")}>
                   Find a wishlist
@@ -154,7 +155,7 @@ function ReservationsBody() {
                       className="h-9 shrink-0 px-3 text-sm text-danger"
                       onClick={() => void release(entry)}
                     >
-                      Release
+                      Let go
                     </Button>
                   </div>
                 </Tag>
@@ -167,13 +168,13 @@ function ReservationsBody() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <Stamp className="text-[11px] text-ink-soft">This item was removed</Stamp>
+                      <Stamp className="text-[11px] text-ink-soft">No longer on their list</Stamp>
                       <p className="truncate font-display text-base font-semibold text-ink-soft">
                         {entry.tombstone?.title ?? "—"}
                       </p>
                       {entry.tombstone && (
                         <p className="font-mono text-xs lowercase text-ink-soft">
-                          u/{entry.tombstone.owner_username} deleted it
+                          u/{entry.tombstone.owner_username} removed it
                         </p>
                       )}
                     </div>
@@ -182,7 +183,7 @@ function ReservationsBody() {
                       className="h-9 shrink-0 px-3 text-sm"
                       onClick={() => void dismiss(entry)}
                     >
-                      Dismiss
+                      Clear it
                     </Button>
                   </div>
                 </Tag>

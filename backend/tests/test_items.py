@@ -86,7 +86,7 @@ class TestCreate:
             data={"title": "One too many"},
         )
         assert r.status_code == 409
-        assert r.json()["detail"] == "40 of 40. Delete something to add more."
+        assert r.json()["detail"] == "That's 40 of 40 — your list is full. Delete one to add another."
 
     async def test_image_over_500kb_rejected(self, client: AsyncClient, unique: str):
         _, auth = await register(client, f"big_{unique}")

@@ -81,11 +81,11 @@ export default function Register() {
     event.preventDefault();
     setError(null);
     if (!formatOk) {
-      setError("Pick a username first: 3–20 characters, lowercase letters, digits, underscore.");
+      setError("Pick a username first — 3–20 characters: lowercase letters, digits, underscore.");
       return;
     }
     if (availability === "taken") {
-      setError("That username is taken. Pick another and resubmit.");
+      setError("Someone got there first. Pick another username.");
       return;
     }
     if (password.length < 8) {
@@ -104,7 +104,7 @@ export default function Register() {
 
   return (
     <AuthShell
-      title="Create your wishlist"
+      title="Start your wishlist"
       footer={
         <>
           Already have one?{" "}

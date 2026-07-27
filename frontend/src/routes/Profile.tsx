@@ -101,7 +101,7 @@ export default function Profile() {
   useEffect(() => {
     const state = location.state as { authedReturn?: boolean } | null;
     if (state?.authedReturn) {
-      toast("You're in — gift statuses on this wishlist are now live.");
+      toast("You're in. Now you can see what's already spoken for.");
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +126,7 @@ export default function Profile() {
   const disableOwnShuffle = useCallback(() => {
     localStorage.setItem(HIDE_OWN_SHUFFLE_KEY, "1");
     setPhase((current) => (current === "deck" ? "reveal" : current));
-    toast("Shuffle stays off on your own profile. Guests still get the deck.");
+    toast("Shuffle is off for you. Your guests still get the full deal.");
   }, [toast]);
 
   const handleReservationChange = useCallback(
@@ -195,7 +195,7 @@ export default function Profile() {
           if (!response.ok) throw new Error("reorder rejected");
         } catch {
           setStatus({ kind: "ready", profile: previous });
-          toast("Reorder didn't save — back to the previous order.", "danger");
+          toast("That order didn't save. Put back the way it was.", "danger");
         }
       })();
     },
@@ -220,8 +220,8 @@ export default function Profile() {
         <AppBar />
         <main className="px-4 py-16">
           <EmptyState
-            title="This wishlist doesn't exist"
-            body="Check the link — usernames are exact."
+            title="No wishlist here"
+            body="Nobody owns this username. Check the spelling — they're exact."
           />
         </main>
       </>
@@ -235,7 +235,7 @@ export default function Profile() {
         <main className="px-4 py-16">
           <EmptyState
             title="Couldn't load this wishlist"
-            body="The server didn't answer. It may be waking up — free hosting naps."
+            body="The server didn't answer. It naps on free hosting — give it a moment and try again."
             action={
               <Button variant="primary" onClick={() => setReloadKey((k) => k + 1)}>
                 Try again
@@ -283,7 +283,7 @@ export default function Profile() {
               </Button>
               {profile.items.length >= 40 && (
                 <Stamp className="text-[11px] text-ink-soft">
-                  40 of 40. Delete something to add more.
+                  40 of 40 — your list is full. Delete one to add another.
                 </Stamp>
               )}
             </div>
@@ -293,8 +293,8 @@ export default function Profile() {
         {profile.items.length === 0 ? (
           isOwnProfile ? (
             <EmptyState
-              title="Nothing here yet"
-              body="Add your first wish — a photo and a name is all it takes."
+              title="Empty for now"
+              body="Add the first thing you actually want — a photo and a name is all it takes."
               action={
                 <Button variant="primary" onClick={() => setItemForm({ mode: "create" })}>
                   Add your first wish
@@ -302,7 +302,10 @@ export default function Profile() {
               }
             />
           ) : (
-            <EmptyState title={`${profile.username} hasn't added anything yet`} />
+            <EmptyState
+              title="Nothing here yet"
+              body={`This wishlist is patiently waiting for ${profile.username}.`}
+            />
           )
         ) : (
           // mounted from the moment the deck starts lifting, so the grid

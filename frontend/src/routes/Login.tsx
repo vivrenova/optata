@@ -44,12 +44,12 @@ export default function Login() {
 
   return (
     <AuthShell
-      title="Log in"
+      title="Welcome back"
       footer={
         <>
           New here?{" "}
           <Link to="/register" className="font-medium text-ink underline">
-            Create your wishlist
+            Start your wishlist
           </Link>
         </>
       }

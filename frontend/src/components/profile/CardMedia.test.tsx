@@ -23,25 +23,29 @@ const guestFree: GuestItem = { ...core, view: "guest", is_reserved: false, reser
 const anonymous: AnonymousItem = { ...core, view: "anonymous" };
 const owner: OwnerItem = { ...core, view: "owner", view_count: 7 };
 
+/** Any wording that would betray a reservation. Kept as one pattern so the
+ * §4.1 checks can't drift apart from the copy. */
+const RESERVATION_LANGUAGE = /spoken for|yours to give|gifted|gifting|reserved/i;
+
 describe("reservation badges follow the §4.1 three-way split", () => {
   it("guest + reserved by someone → hatch label, no name ever", () => {
     render(<CardMedia item={guestReserved} fit="natural" />);
-    expect(screen.getByText("Already being gifted")).toBeDefined();
+    expect(screen.getByText("Already spoken for")).toBeDefined();
   });
 
-  it("guest + reserved by me → 'You're gifting this'", () => {
+  it("guest + reserved by me → 'Yours to give'", () => {
     render(<CardMedia item={guestMine} fit="natural" />);
-    expect(screen.getByText("You're gifting this")).toBeDefined();
+    expect(screen.getByText("Yours to give")).toBeDefined();
   });
 
   it("guest + free → no overlay at all", () => {
     render(<CardMedia item={guestFree} fit="natural" />);
-    expect(screen.queryByText(/gifted|gifting/)).toBeNull();
+    expect(screen.queryByText(RESERVATION_LANGUAGE)).toBeNull();
   });
 
   it("ANONYMOUS → no reservation state exists, so nothing can render", () => {
     render(<CardMedia item={anonymous} fit="natural" />);
-    expect(screen.queryByText(/gifted|gifting/)).toBeNull();
+    expect(screen.queryByText(RESERVATION_LANGUAGE)).toBeNull();
   });
 
   it("OWNER card → view counter in mono, zero reservation language", () => {
@@ -49,6 +53,6 @@ describe("reservation badges follow the §4.1 three-way split", () => {
       <DeckCard item={owner} position={0} total={5} dragging={false} />,
     );
     expect(screen.getByText("7 views")).toBeDefined();
-    expect(screen.queryByText(/gifted|gifting|reserved/i)).toBeNull();
+    expect(screen.queryByText(RESERVATION_LANGUAGE)).toBeNull();
   });
 });

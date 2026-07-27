@@ -73,13 +73,13 @@ function ItemModalBody({
       const response = await api(`/items/${item.id}`, { method: "DELETE" });
       if (response.status === 204) {
         onDeleted?.(item.id);
-        toast("Deleted. Gone for good.");
+        toast("Gone. That one's off the list for good.");
       } else {
         const parsed: unknown = await response.json().catch(() => null);
         toast(errorDetail(parsed, "That didn't go through. Try again."), "danger");
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try that again.", "danger");
     } finally {
       setBusy(false);
     }
@@ -96,13 +96,13 @@ function ItemModalBody({
         toast(`Saved to your reservations. ${ownerUsername} won't know.`);
       } else if (response.status === 409) {
         onReservationChange(item.id, { is_reserved: true, reserved_by_me: false });
-        toast("Someone beat you to it — it's already being gifted.", "danger");
+        toast("Someone beat you to it. Pick another — they'll never know.", "danger");
       } else {
         const body: unknown = await response.json().catch(() => null);
         toast(errorDetail(body, "That didn't go through. Try again."), "danger");
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try that again.", "danger");
     } finally {
       setBusy(false);
     }
@@ -114,13 +114,13 @@ function ItemModalBody({
       const response = await api(`/items/${item.id}/reserve`, { method: "DELETE" });
       if (response.status === 204) {
         onReservationChange(item.id, { is_reserved: false, reserved_by_me: false });
-        toast("Reservation released.");
+        toast("Let go. It's back up for grabs.");
       } else {
         const body: unknown = await response.json().catch(() => null);
         toast(errorDetail(body, "That didn't go through. Try again."), "danger");
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try again.", "danger");
+      toast(err instanceof ApiError ? err.message : "Can't reach the server. Try that again.", "danger");
     } finally {
       setBusy(false);
     }
@@ -156,13 +156,13 @@ function ItemModalBody({
       {item.view === "guest" &&
         (item.reserved_by_me ? (
           <div className="flex flex-col gap-2">
-            <Stamp>You're gifting this</Stamp>
+            <Stamp>This one's yours to give</Stamp>
             <Button variant="ghost" loading={busy} onClick={() => void release()} className="text-danger">
-              Release reservation
+              Actually, let it go
             </Button>
           </div>
         ) : item.is_reserved ? (
-          <Stamp className="py-1">Already being gifted</Stamp>
+          <Stamp className="py-1">Already spoken for</Stamp>
         ) : (
           <Button variant="primary" loading={busy} onClick={() => void reserve()}>
             I'll gift this
@@ -178,9 +178,9 @@ function ItemModalBody({
           </Button>
           {confirmingDelete ? (
             <div className="flex flex-col gap-2 rounded-[10px] border-2 border-danger p-3">
-              <p className="text-sm">Delete for good? The photo goes too.</p>
+              <p className="text-sm">Delete this for good? The photo goes with it.</p>
               <Button variant="danger" loading={busy} onClick={() => void deleteItem()}>
-                Delete forever
+                Yes, delete it
               </Button>
               <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
                 Keep it
@@ -197,11 +197,11 @@ function ItemModalBody({
       {item.view === "anonymous" &&
         (loginPrompt ? (
           <div className="flex flex-col gap-3 rounded-[10px] border-2 border-ink bg-paper-deep p-4">
-            <h3 className="font-display text-lg font-semibold">Reserving needs an account</h3>
+            <h3 className="font-display text-lg font-semibold">Let's keep this between us</h3>
             <p className="text-sm leading-relaxed">
-              Gift statuses are private between gift-givers — {ownerUsername} never sees who
-              reserved what, or that anything was reserved at all. Log in and this wishlist
-              will show you what's still free, so nobody doubles up.
+              Calling dibs takes an account — that's how we keep it secret. {ownerUsername}{" "}
+              never sees who reserved what, or that anything was reserved at all. Log in and
+              you'll see what's still free, so two of you don't buy the same thing.
             </p>
             <div className="flex flex-col gap-2">
               <Button variant="primary" onClick={() => goToLogin("/login")}>
