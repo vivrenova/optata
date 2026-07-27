@@ -72,25 +72,18 @@ class TestHappyPath:
 
 
 class TestRefreshRotation:
-    async def test_reused_refresh_token_nukes_the_family(self, client: AsyncClient, unique: str):
+    # Contract since Stage 3: reuse INSIDE the 30s grace window (with a
+    # recorded successor) is the multi-tab race → converge, don't nuke.
+    # Reuse OUTSIDE the window is theft → nuke the family. Both directions
+    # are pinned in tests/test_refresh_grace.py.
+    async def test_rotation_happens_on_every_refresh(self, client: AsyncClient, unique: str):
         r = await register(client, unique)
         first = refresh_cookie_value(r)
 
         r = await client.post("/auth/refresh")
         assert r.status_code == 200
         second = client.cookies.get("refresh_token")
-        assert second != first
-
-        # replay the first (now revoked) token — theft signal.
-        # Bypass the cookie jar: send the Cookie header explicitly.
-        client.cookies.clear()
-        r = await client.post("/auth/refresh", headers={"Cookie": f"refresh_token={first}"})
-        assert r.status_code == 401
-
-        # the whole family is dead: the second token no longer works either
-        client.cookies.clear()
-        r = await client.post("/auth/refresh", headers={"Cookie": f"refresh_token={second}"})
-        assert r.status_code == 401
+        assert second != first, "every refresh must rotate the token"
 
 
 class TestForgotPassword:

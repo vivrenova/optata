@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     email_from: str = "onboarding@resend.dev"
 
+    # Comma-separated list of allowed origins. The FIRST one is canonical —
+    # it's the origin used in password-reset links.
     frontend_origin: str = "http://localhost:5173"
 
     # Refresh-cookie flags come from config, not from environment branching.
@@ -36,6 +38,14 @@ class Settings(BaseSettings):
     # GET /debug/whoami — proxy-resolution truth endpoint for the Stage 6
     # audit on Render. Off everywhere by default.
     debug_whoami: bool = False
+
+    @property
+    def frontend_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.frontend_origin.split(",") if origin.strip()]
+
+    @property
+    def primary_frontend_origin(self) -> str:
+        return self.frontend_origin_list[0]
 
 
 @lru_cache

@@ -1,6 +1,3 @@
-import "@fontsource-variable/bricolage-grotesque";
-import "@fontsource-variable/inter";
-import "@fontsource-variable/jetbrains-mono";
 import "./index.css";
 
 import { StrictMode } from "react";

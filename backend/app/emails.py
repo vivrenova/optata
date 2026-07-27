@@ -16,7 +16,7 @@ async def send_password_reset_email(to_email: str, reset_url: str) -> None:
         return
 
     body = (
-        "You asked to reset your Wishlist password.\n"
+        "You asked to reset your OPTATA password.\n"
         "\n"
         f"Set a new one here (the link works for 1 hour):\n{reset_url}\n"
         "\n"
@@ -28,9 +28,9 @@ async def send_password_reset_email(to_email: str, reset_url: str) -> None:
                 RESEND_ENDPOINT,
                 headers={"Authorization": f"Bearer {settings.resend_api_key}"},
                 json={
-                    "from": f"Wishlist <{settings.email_from}>",
+                    "from": f"OPTATA <{settings.email_from}>",
                     "to": [to_email],
-                    "subject": "Reset your Wishlist password",
+                    "subject": "Reset your OPTATA password",
                     "text": body,
                 },
             )

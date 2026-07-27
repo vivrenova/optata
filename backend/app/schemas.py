@@ -96,11 +96,14 @@ class PasswordChangeIn(BaseModel):
 
 
 # --- items on a profile (tech-spec §4.1) ---
-# Two separate schemas, no conditional excludes. The owner schema has no
-# reservation fields AT ALL; the guest schema has no view_count AT ALL.
+# THREE separate schemas, no conditional excludes. Anonymous viewers get
+# item facts only: an owner who logs out or opens an incognito window is
+# indistinguishable from a stranger, so showing reservation state to
+# anonymous viewers would hand every owner their own spoilers. An anonymous
+# viewer can't reserve anyway — the field buys them nothing.
 
 
-class ItemBaseOut(BaseModel):
+class ItemAnonymousOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -114,11 +117,11 @@ class ItemBaseOut(BaseModel):
     order_index: int
 
 
-class ItemOwnerOut(ItemBaseOut):
+class ItemOwnerOut(ItemAnonymousOut):
     view_count: int
 
 
-class ItemGuestOut(ItemBaseOut):
+class ItemGuestOut(ItemAnonymousOut):
     is_reserved: bool
     reserved_by_me: bool
 
@@ -139,6 +142,15 @@ class ProfileGuestOut(BaseModel):
     avatar_url: str | None
     is_owner: bool = False
     items: list[ItemGuestOut]
+
+
+class ProfileAnonymousOut(BaseModel):
+    username: str
+    display_name: str | None
+    bio: str | None
+    avatar_url: str | None
+    is_owner: bool = False
+    items: list[ItemAnonymousOut]
 
 
 # --- items: mutations ---

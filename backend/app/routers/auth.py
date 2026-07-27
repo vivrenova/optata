@@ -22,6 +22,7 @@ from app.schemas import (
 )
 from app.security import (
     DUMMY_PASSWORD_HASH,
+    REFRESH_REUSE_GRACE,
     REFRESH_TOKEN_TTL,
     RESET_TOKEN_TTL,
     create_access_token,
@@ -66,16 +67,30 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-async def _issue_refresh_token(db: AsyncSession, user_id: uuid.UUID) -> str:
+async def _issue_refresh_token(db: AsyncSession, user_id: uuid.UUID) -> tuple[str, RefreshToken]:
     raw, token_hash = generate_opaque_token()
-    db.add(
-        RefreshToken(
-            user_id=user_id,
-            token_hash=token_hash,
-            expires_at=datetime.now(timezone.utc) + REFRESH_TOKEN_TTL,
-        )
+    token = RefreshToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + REFRESH_TOKEN_TTL,
     )
-    return raw
+    db.add(token)
+    return raw, token
+
+
+async def _revoke_successor_chain(db: AsyncSession, token: RefreshToken) -> None:
+    """Kill every token that descended from this one via rotation."""
+    now = datetime.now(timezone.utc)
+    current = token
+    for _ in range(32):  # cycle guard
+        if current.replaced_by_id is None:
+            return
+        successor = await db.get(RefreshToken, current.replaced_by_id)
+        if successor is None:
+            return
+        if successor.revoked_at is None:
+            successor.revoked_at = now
+        current = successor
 
 
 async def revoke_all_refresh_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -115,7 +130,7 @@ async def register(request: Request, body: RegisterIn, response: Response, db: D
         # Lost a race with a concurrent registration on a unique column
         raise HTTPException(status.HTTP_409_CONFLICT, "This email or username is taken.")
 
-    raw_refresh = await _issue_refresh_token(db, user.id)
+    raw_refresh, _ = await _issue_refresh_token(db, user.id)
     await db.commit()
 
     _set_refresh_cookie(response, raw_refresh)
@@ -134,7 +149,7 @@ async def login(request: Request, body: LoginIn, response: Response, db: DbSessi
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, LOGIN_FAILED)
 
-    raw_refresh = await _issue_refresh_token(db, user.id)
+    raw_refresh, _ = await _issue_refresh_token(db, user.id)
     await db.commit()
 
     _set_refresh_cookie(response, raw_refresh)
@@ -154,15 +169,44 @@ async def refresh(request: Request, response: Response, db: DbSession) -> TokenO
         _clear_refresh_cookie(response)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
 
-    if token.revoked_at is not None:
-        # A revoked token came back: theft signal. Kill the whole family.
-        await revoke_all_refresh_tokens(db, token.user_id)
-        await db.commit()
-        _clear_refresh_cookie(response)
-        log.warning("refresh_token_reuse_detected")
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
+    now = datetime.now(timezone.utc)
 
-    if token.expires_at <= datetime.now(timezone.utc):
+    if token.revoked_at is not None:
+        # Reuse of a rotated token. Browsers share one cookie jar, so two
+        # tabs mounting together both send the same token — if it was
+        # rotated seconds ago and HAS a recorded successor, that's the
+        # benign race (rotation leeway, same tradeoff Auth0 makes), not theft.
+        is_benign_race = (
+            token.replaced_by_id is not None
+            and now - token.revoked_at < REFRESH_REUSE_GRACE
+        )
+        if not is_benign_race:
+            await revoke_all_refresh_tokens(db, token.user_id)
+            await db.commit()
+            _clear_refresh_cookie(response)
+            log.warning("refresh_token_reuse_detected")
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
+
+        user = await db.get(User, token.user_id)
+        if user is None:
+            _clear_refresh_cookie(response)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
+
+        # Converge both racers onto one fresh token: kill the successor
+        # chain, issue a replacement, keep the family alive.
+        await _revoke_successor_chain(db, token)
+        raw_refresh, new_token = await _issue_refresh_token(db, user.id)
+        await db.flush()
+        token.replaced_by_id = new_token.id
+        await db.commit()
+        log.info("refresh_reuse_grace_applied")
+
+        _set_refresh_cookie(response, raw_refresh)
+        return TokenOut(
+            access_token=create_access_token(user.id), user=UserPrivate.model_validate(user)
+        )
+
+    if token.expires_at <= now:
         _clear_refresh_cookie(response)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
 
@@ -171,9 +215,11 @@ async def refresh(request: Request, response: Response, db: DbSession) -> TokenO
         _clear_refresh_cookie(response)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Log in again.")
 
-    # Rotation: the old token dies, a new one replaces it
-    token.revoked_at = datetime.now(timezone.utc)
-    raw_refresh = await _issue_refresh_token(db, user.id)
+    # Rotation: the old token dies, the successor is recorded
+    token.revoked_at = now
+    raw_refresh, new_token = await _issue_refresh_token(db, user.id)
+    await db.flush()
+    token.replaced_by_id = new_token.id
     await db.commit()
 
     _set_refresh_cookie(response, raw_refresh)
@@ -211,7 +257,7 @@ async def forgot_password(
             )
         )
         await db.commit()
-        reset_url = f"{get_settings().frontend_origin}/reset-password?token={raw}"
+        reset_url = f"{get_settings().primary_frontend_origin}/reset-password?token={raw}"
         background_tasks.add_task(send_password_reset_email, user.email, reset_url)
     return {"detail": "If that email is registered, a reset link is on its way."}
 

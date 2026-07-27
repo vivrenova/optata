@@ -11,6 +11,17 @@ from app.config import get_settings
 ACCESS_TOKEN_TTL = timedelta(minutes=15)
 REFRESH_TOKEN_TTL = timedelta(days=30)
 RESET_TOKEN_TTL = timedelta(hours=1)
+# Reuse of a rotated refresh token inside this window (with a recorded
+# successor) is the shared-cookie-jar race between tabs, not theft.
+REFRESH_REUSE_GRACE = timedelta(seconds=30)
+
+
+class AccessTokenExpired(Exception):
+    """The JWT was valid once — the client should refresh and retry."""
+
+
+class AccessTokenInvalid(Exception):
+    """The JWT never was valid — the client should log out."""
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -32,12 +43,16 @@ def create_access_token(user_id: uuid.UUID) -> str:
     return jwt.encode(payload, get_settings().jwt_secret, algorithm="HS256")
 
 
-def decode_access_token(token: str) -> uuid.UUID | None:
+def decode_access_token(token: str) -> uuid.UUID:
+    """Raises AccessTokenExpired / AccessTokenInvalid — the two cases get
+    different 401s (RFC 6750) so the client knows whether to refresh."""
     try:
         payload = jwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
         return uuid.UUID(payload["sub"])
-    except (jwt.InvalidTokenError, KeyError, ValueError):
-        return None
+    except jwt.ExpiredSignatureError as exc:
+        raise AccessTokenExpired from exc
+    except (jwt.InvalidTokenError, KeyError, ValueError) as exc:
+        raise AccessTokenInvalid from exc
 
 
 def generate_opaque_token() -> tuple[str, str]:
