@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import get_settings
@@ -17,6 +18,22 @@ from app.routers import auth, items, reservations, users
 
 configure_logging()
 log = structlog.get_logger()
+
+# Error reporting is opt-in via env: no DSN, no Sentry, no network calls.
+# Initialised before the app object so import-time failures are captured.
+if get_settings().sentry_dsn:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=get_settings().sentry_dsn,
+        # No tracing: the free tier's quota is better spent on errors, and
+        # traces on a single free instance tell us little.
+        traces_sample_rate=0.0,
+        # Never ship request bodies or headers — they carry passwords,
+        # bearer tokens and the refresh cookie.
+        send_default_pii=False,
+    )
+    log.info("sentry_enabled")
 
 
 @asynccontextmanager
@@ -40,6 +57,33 @@ async def _rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Headers for the API's own responses.
+
+    The CSP that matters for the product is served by Vercel with the HTML
+    (see vercel.json) — this API returns JSON and images-by-redirect, never
+    a document. What it still needs: HSTS (so a stray http:// call can't be
+    downgraded), nosniff (so a JSON error body can't be coerced into being
+    executed), a frame ban, and a referrer policy that stops the API URL
+    leaking into third-party logs.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload"
+        )
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # An API response is never a document; lock it down completely.
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

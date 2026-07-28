@@ -55,11 +55,17 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl px-4 pb-8">
+      <footer className="mx-auto flex w-full max-w-5xl flex-wrap gap-x-6 gap-y-1 px-4 pb-8">
         <Stamp className="block text-[11px] text-ink-soft">
           Questions or ideas?{" "}
           <a href="mailto:hello@optata.app" className="underline underline-offset-4">
             hello@optata.app
+          </a>
+        </Stamp>
+        <Stamp className="block text-[11px] text-ink-soft">
+          Report abuse:{" "}
+          <a href="mailto:abuse@optata.app" className="underline underline-offset-4">
+            abuse@optata.app
           </a>
         </Stamp>
       </footer>
