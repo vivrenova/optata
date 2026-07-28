@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # audit on Render. Off everywhere by default.
     debug_whoami: bool = False
 
+    # Error reporting. Empty = disabled, which is what local dev and the
+    # test suite run with.
+    sentry_dsn: str = ""
+
     @property
     def frontend_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.frontend_origin.split(",") if origin.strip()]

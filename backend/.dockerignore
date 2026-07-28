@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+uvicorn.log
+*.log
+.env
+.env.*
+!.env.example
+dev.db

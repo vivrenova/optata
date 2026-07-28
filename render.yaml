@@ -1,0 +1,55 @@
+# Render Blueprint — makes the service reproducible instead of a pile of
+# dashboard clicks. Import via Render → New → Blueprint, pointed at this repo.
+#
+# Every secret is `sync: false`: Render prompts for the value on first
+# deploy and never stores it in git. The non-secret values are pinned here
+# precisely because they are the ones that silently break auth if they
+# drift (cookie flags, origin, proxy trust).
+services:
+  - type: web
+    name: optata-api
+    runtime: docker
+    plan: free
+    region: frankfurt # closest to the Supabase EU project; keeps DB latency low
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+
+    # On a paid instance, uncomment to run migrations once per deploy rather
+    # than on every container start. The entrypoint already guarantees the
+    # ordering; this only removes the redundant no-op run.
+    # preDeployCommand: alembic upgrade head
+
+    envVars:
+      # --- secrets: entered in the dashboard, never in git ---
+      - key: DATABASE_URL # Supabase PROD, session pooler (port 5432), postgresql+asyncpg://
+        sync: false
+      - key: JWT_SECRET # openssl rand -hex 32 — a NEW one for prod, not the dev value
+        sync: false
+      - key: SUPABASE_URL # https://<prod-ref>.supabase.co
+        sync: false
+      - key: SUPABASE_SERVICE_KEY # service_role key. Backend only. Never a VITE_ var.
+        sync: false
+      - key: RESEND_API_KEY # Resend key for the verified send.optata.app domain
+        sync: false
+      - key: SENTRY_DSN # optional; leave unset to disable error reporting
+        sync: false
+
+      # --- the values that decide whether auth works at all ---
+      - key: FRONTEND_ORIGIN # CORS allow-list AND the base of password-reset links
+        value: https://optata.app
+      - key: COOKIE_DOMAIN # leading dot: cookie set by api.optata.app, sent to optata.app
+        value: .optata.app
+      - key: COOKIE_SECURE # HTTPS-only cookie; .app is HSTS-preloaded so this is free
+        value: "true"
+      - key: COOKIE_SAMESITE # same registrable domain => Lax survives Safari ITP
+        value: lax
+      - key: EMAIL_FROM # must be on the Resend-verified domain or sends bounce
+        value: noreply@send.optata.app
+
+      # --- operational ---
+      - key: DEBUG_WHOAMI # /debug/whoami is 404 unless this is true. Flip only to audit.
+        value: "false"
+      - key: FORWARDED_ALLOW_IPS # SEE THE RUNBOOK — do not set "*", it enables XFF spoofing
+        sync: false
