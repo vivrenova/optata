@@ -34,7 +34,12 @@ log = structlog.get_logger()
 router = APIRouter(prefix="/items", tags=["items"])
 
 MAX_ITEMS = 40
-MAX_IMAGE_BYTES = 500 * 1024
+# Must match SERVER_LIMIT_BYTES in frontend/src/lib/imagePipeline.ts.
+# 1MB, not 500KB: browsers without a WebP encoder (iOS Safari) send JPEG,
+# which is bigger for the same picture. The pixel budget in reencode_webp —
+# not this number — is what stops a decompression bomb, so raising it costs
+# storage, never safety.
+MAX_IMAGE_BYTES = 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"image/webp", "image/jpeg", "image/png"}
 ACCENT_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 DEFAULT_ACCENT = "#D6D6D1"  # --paper-deep
@@ -117,7 +122,7 @@ async def _process_upload(image: StarletteUploadFile) -> bytes:
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,
-            "That image is over 500KB. Shrink it and try again.",
+            f"That image is over {MAX_IMAGE_BYTES // 1024}KB. Shrink it and try again.",
         )
     try:
         return await anyio.to_thread.run_sync(reencode_webp, data)

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 
 import { api, ApiError, errorDetail } from "../../api/client";
 import type { OwnerItem } from "../../api/types";
-import { processImageFile } from "../../lib/imagePipeline";
+import { filenameFor, processImageFile } from "../../lib/imagePipeline";
 import type { ProcessedImage } from "../../lib/imagePipeline";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -138,7 +138,7 @@ export function ItemFormModal({
     const normalizedPrice = price.trim().replace(",", ".");
 
     if (state!.mode === "create") {
-      body.append("image", processed!.blob, "photo.webp");
+      body.append("image", processed!.blob, filenameFor(processed!.mimeType));
       body.append("accent_color", processed!.accentHex);
       body.append("title", cleanTitle);
       if (cleanLink) body.append("link", cleanLink);
@@ -150,7 +150,7 @@ export function ItemFormModal({
     } else {
       const item = editing!;
       if (processed) {
-        body.append("image", processed.blob, "photo.webp");
+        body.append("image", processed.blob, filenameFor(processed.mimeType));
         body.append("accent_color", processed.accentHex);
       }
       if (cleanTitle !== item.title) body.append("title", cleanTitle);
@@ -239,16 +239,25 @@ export function ItemFormModal({
           >
             {processed || editing ? "Swap the photo" : "Pick a photo"}
           </Button>
-          {processed && (
-            <Stamp className="text-[11px] text-ink-soft">
-              {Math.round(processed.blob.size / 1024)} KB · {processed.width}×{processed.height} ·{" "}
-              {processed.accentHex}
-            </Stamp>
-          )}
           {photoError && (
             <p role="alert" className="text-sm text-danger">
               {photoError}
             </p>
+          )}
+          {processed && (
+            // Format first, and it is the format the browser REALLY produced.
+            // On a phone this line is the only diagnostic anyone has.
+            //
+            // The "still using" prefix is not cosmetic: a failed pick leaves
+            // the previous photo in place (correctly — it is still valid and
+            // still what will upload), and without the prefix its numbers sit
+            // directly under the new error, reading as if the error described
+            // THEM. That is how a rejection got reported against a 53KB file.
+            <Stamp className="text-[11px] text-ink-soft">
+              {photoError && "still using: "}
+              {processed.mimeType.replace("image/", "")} · {Math.round(processed.blob.size / 1024)}{" "}
+              KB · {processed.width}×{processed.height} · {processed.accentHex}
+            </Stamp>
           )}
         </div>
 

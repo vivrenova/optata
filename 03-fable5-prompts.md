@@ -128,7 +128,9 @@ Items:
 - Hard limit 40 per user. Enforce in the service layer before insert. 41st returns 409
   with a message the UI can show directly.
 - POST /items is multipart. Server pipeline:
-    1. reject > 500KB; content-type whitelist webp/jpeg/png
+    1. reject > 1MB; content-type whitelist webp/jpeg/png. (1MB, not 500KB: a browser
+       with no WebP encoder sends JPEG, which is bigger. The decompression-bomb guard is
+       the pixel budget below, not this limit.)
     2. open with Pillow, re-encode to WebP q=82 — this validates it is a real image AND
        strips EXIF including GPS. Non-negotiable: users photograph things at home.
     3. upload to Supabase Storage bucket "items", key {user_id}/{item_id}.webp
@@ -308,7 +310,10 @@ Item create/edit modal:
   note. Optional fields are visually secondary — the photo is the hero.
 - Client-side image pipeline, all before upload:
     1. resize to max 1200px on the long edge via canvas
-    2. export WebP q=0.82, target ≤300KB
+    2. export WebP, stepping quality down toward ≤800KB. Where the browser cannot encode
+       WebP (iOS Safari), fall back to JPEG — never PNG, which is lossless and ignores the
+       quality argument. Detect support from the produced blob's own type: toBlob returns
+       a PNG, not null, for a format it cannot write. Never sniff the user agent.
     3. extract the accent colour from the same canvas: downsample to 32×32, quantize,
        pick the dominant colour, discarding near-white and near-black. Send the hex.
     4. show a live preview, with the extracted colour already applied as the tag
