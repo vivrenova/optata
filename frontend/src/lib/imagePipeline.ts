@@ -1,7 +1,8 @@
 /**
  * Client-side image pipeline (tech-spec §3). Runs BEFORE upload:
- * resize to max 1200px on the long edge, export WebP q=0.82 targeting
- * ≤300KB, extract the dominant accent color from a 32×32 downsample.
+ * resize to max 1200px on the long edge, export WebP (falling back to JPEG
+ * where WebP encoding is unavailable) stepping quality down toward ≤800KB,
+ * extract the dominant accent color from a 32×32 downsample.
  *
  * This is an OPTIMIZATION on top of the server pipeline, never a
  * replacement: the server still re-encodes with Pillow, strips EXIF/GPS
@@ -10,9 +11,21 @@
  */
 
 export const MAX_LONG_EDGE = 1200;
-export const TARGET_BYTES = 300 * 1024;
-// server hard limit is 500KB — refuse to upload anything that would bounce
-export const SERVER_LIMIT_BYTES = 500 * 1024;
+// Phones shoot 3–5MB; rejecting those at pick time is the wrong constraint,
+// since we are about to downscale anyway. This only stops absurd inputs.
+export const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+export const TARGET_BYTES = 800 * 1024;
+// Must match MAX_IMAGE_BYTES in backend/app/routers/items.py — anything
+// bigger would bounce at the server, so we refuse it here with a better
+// message than a bare 413.
+export const SERVER_LIMIT_BYTES = 1024 * 1024;
+
+// Encoder ladders. We ask for WebP first (smallest for photos) and fall
+// back to JPEG. Never PNG: it is lossless, so it IGNORES the quality
+// argument entirely — on a 933x1200 photo it produces the same ~2.5MB at
+// q=0.82 and q=0.5. That is precisely the trap below.
+const WEBP_QUALITIES = [0.9, 0.82, 0.72, 0.62, 0.5];
+const JPEG_QUALITIES = [0.92, 0.85, 0.75, 0.65, 0.55];
 
 export const PIPELINE_FALLBACK_ACCENT = "#D6D6D1"; // --paper-deep
 
@@ -107,6 +120,18 @@ export interface ProcessedImage {
   accentHex: string;
   width: number;
   height: number;
+  /** The format the browser ACTUALLY produced — not the one we asked for.
+   * Surfaced in the UI so an upload problem is diagnosable on a device we
+   * cannot open a console on. */
+  mimeType: string;
+}
+
+/** Filename matching the real encoding. The server keys off the multipart
+ * content-type, not this, but a truthful name keeps logs honest. */
+export function filenameFor(mimeType: string): string {
+  if (mimeType === "image/webp") return "photo.webp";
+  if (mimeType === "image/png") return "photo.png";
+  return "photo.jpg";
 }
 
 async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
@@ -134,10 +159,52 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+/**
+ * Encode, and verify what actually came back.
+ *
+ * The whole iOS bug lived here. Per spec, when `toBlob` is handed a type it
+ * cannot encode it does NOT return null — it silently falls back to PNG.
+ * iOS Safari does exactly that for `image/webp`. Checking for null therefore
+ * detects nothing, the "quality step-down" loop re-encodes an identical
+ * lossless PNG three times, and the user is told to shrink a file that was
+ * never the problem.
+ *
+ * So: trust the blob's own type, never the requested one, and never the
+ * user agent string.
+ */
+async function encodeAs(
+  canvas: HTMLCanvasElement,
+  type: string,
+  qualities: number[],
+): Promise<{ blob: Blob; supported: boolean }> {
+  let smallest: Blob | null = null;
+  for (const quality of qualities) {
+    const blob = await toBlob(canvas, type, quality);
+    if (blob === null) break; // some UAs do return null for unknown types
+    if (blob.type !== type) {
+      // Encoder unsupported: the UA substituted another format. Report it
+      // so the caller can try the next codec instead of grinding through a
+      // ladder that cannot change the output by even one byte.
+      return { blob, supported: false };
+    }
+    if (smallest === null || blob.size < smallest.size) smallest = blob;
+    if (blob.size <= TARGET_BYTES) break;
+  }
+  if (smallest === null) return { blob: new Blob([]), supported: false };
+  return { blob: smallest, supported: true };
+}
+
 export async function processImageFile(
   file: File,
   maxEdge: number = MAX_LONG_EDGE,
 ): Promise<ProcessedImage> {
+  if (file.size > MAX_INPUT_BYTES) {
+    fail(
+      `That photo is ${Math.round(file.size / 1024 / 1024)}MB — bigger than the ` +
+        `${MAX_INPUT_BYTES / 1024 / 1024}MB we can process. Pick another one.`,
+    );
+  }
+
   let source: ImageBitmap | HTMLImageElement;
   try {
     source = await decode(file);
@@ -184,17 +251,22 @@ export async function processImageFile(
       accentHex = dominantAccentHex(swatchContext.getImageData(0, 0, 32, 32).data);
     }
 
-    // WebP q=0.82, stepping quality down until it fits the 300KB target;
-    // Safari <16 has no WebP encoder — JPEG is fine, the server re-encodes.
-    for (const quality of [0.82, 0.66, 0.5]) {
-      blob = await toBlob(canvas, "image/webp", quality);
-      if (blob === null) break; // encoder unsupported
-      if (blob.size <= TARGET_BYTES) break;
+    // WebP first (smallest for photos). If this browser can't encode it —
+    // iOS Safari can decode WebP but not write it — fall back to JPEG,
+    // which honours the quality argument. Whatever we end up with, the
+    // server re-encodes to WebP anyway, so this only affects upload size.
+    const webp = await encodeAs(canvas, "image/webp", WEBP_QUALITIES);
+    if (webp.supported) {
+      blob = webp.blob;
     }
-    if (blob === null) {
-      for (const quality of [0.85, 0.7, 0.55]) {
-        blob = await toBlob(canvas, "image/jpeg", quality);
-        if (blob !== null && blob.size <= TARGET_BYTES) break;
+    if (blob === null || blob.size > TARGET_BYTES) {
+      const jpeg = await encodeAs(canvas, "image/jpeg", JPEG_QUALITIES);
+      if (jpeg.supported && (blob === null || jpeg.blob.size < blob.size)) {
+        blob = jpeg.blob;
+      } else if (blob === null && jpeg.blob.size > 0) {
+        // Neither codec is available; keep whatever the UA produced (PNG).
+        // The server accepts PNG too, so this still works if it fits.
+        blob = jpeg.blob;
       }
     }
   } catch (err) {
@@ -205,10 +277,29 @@ export async function processImageFile(
 
   if ("close" in source) source.close();
 
-  if (blob === null) fail("Couldn't encode this photo. Try a different one.");
+  if (blob === null || blob.size === 0) {
+    fail("Your browser couldn't convert this photo. Try a JPEG, or a screenshot of it.");
+  }
   if (blob.size > SERVER_LIMIT_BYTES) {
-    fail("This photo is still too large after compressing. Pick a smaller one.");
+    // Say what actually happened. Telling someone to "pick a smaller one"
+    // when their input was tiny — the old message — sends them chasing a
+    // problem that isn't there. The size here is the OUTPUT size, and if
+    // we're still over budget after the whole ladder, the cause is almost
+    // always that the browser gave us a lossless format.
+    const outKb = Math.round(blob.size / 1024);
+    const format = blob.type || "an unknown format";
+    fail(
+      `Your browser encoded this as ${format} at ${outKb}KB, over the ` +
+        `${SERVER_LIMIT_BYTES / 1024}KB limit. Try saving the photo as a JPEG and picking that.`,
+    );
   }
 
-  return { blob, previewUrl: URL.createObjectURL(blob), accentHex, width, height };
+  return {
+    blob,
+    previewUrl: URL.createObjectURL(blob),
+    accentHex,
+    width,
+    height,
+    mimeType: blob.type || "unknown",
+  };
 }

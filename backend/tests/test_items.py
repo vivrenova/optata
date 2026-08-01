@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.images import reencode_webp
 from app.models import Item
 from app.rate_limit import limiter
+from app.routers.items import MAX_IMAGE_BYTES
 from tests.helpers import create_item, image_bytes, register
 
 
@@ -88,15 +89,33 @@ class TestCreate:
         assert r.status_code == 409
         assert r.json()["detail"] == "That's 40 of 40 — your list is full. Delete one to add another."
 
-    async def test_image_over_500kb_rejected(self, client: AsyncClient, unique: str):
+    async def test_image_over_limit_rejected(self, client: AsyncClient, unique: str):
         _, auth = await register(client, f"big_{unique}")
         r = await client.post(
             "/items",
             headers=auth,
-            files={"image": ("big.png", b"\x89PNG" + b"\x00" * (500 * 1024 + 1), "image/png")},
+            files={
+                "image": ("big.png", b"\x89PNG" + b"\x00" * MAX_IMAGE_BYTES, "image/png")
+            },
             data={"title": "Too big"},
         )
         assert r.status_code == 413
+        assert "1024KB" in r.json()["detail"]
+
+    async def test_image_between_old_and_new_limit_passes_the_size_gate(
+        self, client: AsyncClient, unique: str
+    ):
+        """The limit was raised 500KB -> 1MB because browsers with no WebP
+        encoder send JPEG. A 600KB upload must get past the size check; it
+        still fails as junk bytes, but with 415, not 413."""
+        _, auth = await register(client, f"mid_{unique}")
+        r = await client.post(
+            "/items",
+            headers=auth,
+            files={"image": ("mid.png", b"\x89PNG" + b"\x00" * (600 * 1024), "image/png")},
+            data={"title": "Middling"},
+        )
+        assert r.status_code == 415
 
     async def test_wrong_content_type_and_polyglot_rejected(
         self, client: AsyncClient, unique: str

@@ -146,12 +146,21 @@ coordinated across tabs with the Web Locks API.
 
 ### 3. The image pipeline runs on the client *and* the server
 
-The client resizes to 1200px on the long edge, encodes WebP q≈0.82 targeting ≤300KB, and
-extracts the accent colour from a 32×32 downsample of the same canvas.
+The client resizes to 1200px on the long edge, encodes WebP stepping quality down toward
+≤800KB, and extracts the accent colour from a 32×32 downsample of the same canvas.
 
-**Why client-side:** Supabase's free tier is 1GB. At 40 items × 300KB that's ~12MB/user
-(~80 users); uncompressed it's ~20 users. Render's free instance also has no CPU budget to
-spare for image processing.
+**Why the codec is chosen by inspecting the output, not the user agent:** `canvas.toBlob`
+does not return `null` for a format it cannot encode — it silently returns a **PNG**. iOS
+Safari does exactly that for WebP, and PNG is lossless, so every "step the quality down"
+retry returns a byte-identical 2.5MB file. Checking `blob === null` therefore detects
+nothing. The pipeline compares `blob.type` to the type it asked for, and falls back to
+JPEG — never PNG — the moment they differ. That is also why the server limit is 1MB and
+not 500KB: a browser with no WebP encoder legitimately sends a larger JPEG.
+
+**Why client-side at all:** Supabase's free tier is 1GB. What lands in storage is the
+server's re-encoded WebP — around 300KB — so 40 items is ~12MB/user (~80 users);
+uncompressed it's ~20 users. Render's free instance also has no CPU budget to spare for
+image processing.
 
 **Why the server still re-encodes anyway** — this is the important half. The client pipeline
 is an *optimisation*, never a security boundary: anything a browser does can be skipped by a

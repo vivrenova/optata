@@ -12,7 +12,7 @@ import { Stamp } from "../components/ui/Stamp";
 import { Tag } from "../components/ui/Tag";
 import { TextArea } from "../components/ui/TextArea";
 import { useToast } from "../components/ui/Toast";
-import { processImageFile } from "../lib/imagePipeline";
+import { filenameFor, processImageFile } from "../lib/imagePipeline";
 import { usernameLockUntil } from "../lib/usernameLock";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
@@ -61,7 +61,7 @@ function AvatarSection({ user }: { user: UserPrivate }) {
       const processed = await processImageFile(file, 512);
       URL.revokeObjectURL(processed.previewUrl);
       const body = new FormData();
-      body.append("image", processed.blob, "avatar.webp");
+      body.append("image", processed.blob, filenameFor(processed.mimeType));
       const response = await api("/users/me/avatar", { method: "POST", body });
       if (!response.ok) {
         const parsed: unknown = await response.json().catch(() => null);
