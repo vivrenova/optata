@@ -499,4 +499,4 @@ npm run dev
 
 ## Author
 
-Bohdan Storozh — [github.com/fabulanova](https://github.com/fabulanova) · bodiastorozh@gmail.com
+Bohdan Storozh — [github.com/vivrenova](https://github.com/vivrenova) · [bodiastorozh@icloud.com](mailto:bodiastorozh@icloud.com) · [Telegram](https://t.me/vivrenova)
