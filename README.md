@@ -1,3 +1,8 @@
+<p align="right">
+  <a href="README.md"><img src="https://img.shields.io/badge/English-181715?style=for-the-badge" alt="English"></a>
+  <a href="README.uk.md"><img src="https://img.shields.io/badge/%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0-e8e4da?style=for-the-badge" alt="Українська"></a>
+</p>
+
 # OPTATA
 
 **One link. Everything you actually want.**
@@ -499,4 +504,4 @@ npm run dev
 
 ## Author
 
-Bohdan Storozh — [github.com/vivrenova](https://github.com/vivrenova) · [bodiastorozh@icloud.com](mailto:bodiastorozh@icloud.com) · [Telegram](https://t.me/vivrenova)
+Bohdan Storozhuk — [github.com/vivrenova](https://github.com/vivrenova) · [bodiastorozh@icloud.com](mailto:bodiastorozh@icloud.com) · [Telegram](https://t.me/vivrenova)
